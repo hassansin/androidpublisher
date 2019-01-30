@@ -8,6 +8,7 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		v.MoveCursor(0, 1, false)
 	}
+	status.Reset()
 	return nil
 }
 
@@ -15,6 +16,7 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		v.MoveCursor(0, -1, false)
 	}
+	status.Reset()
 	return nil
 }
 

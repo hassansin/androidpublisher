@@ -1,10 +1,11 @@
 module androidpublisher-cli
 
 require (
-	github.com/davecgh/go-spew v1.1.1
+	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/hassansin/gocui v0.5.0
 	github.com/jroimartin/gocui v0.4.0
+	github.com/logrusorgru/aurora v0.0.0-20181002194514-a7b3b318ed4e
 	github.com/mattn/go-colorable v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/mattn/go-runewidth v0.0.4 // indirect

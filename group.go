@@ -27,7 +27,7 @@ type Group struct {
 type Operation struct {
 	Name   string
 	Params []*Param
-	Do     func([]*Param) string
+	Do     func([]*Param) (string, error)
 }
 
 type Param struct {

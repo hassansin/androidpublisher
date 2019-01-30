@@ -6,13 +6,16 @@
 package main
 
 import (
-	"androidpublisher-cli/form"
+	"androidpublisher-cli/ui"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/hassansin/gocui"
+	"github.com/logrusorgru/aurora"
 	"github.com/nwidger/jsoncolor"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -24,6 +27,7 @@ import (
 
 var (
 	service *androidpublisher.Service
+	status  *ui.StatusLine
 	groups  Groups
 	pkgName string
 	idx     int
@@ -46,6 +50,7 @@ func nextView(g *gocui.Gui, v *gocui.View) error {
 }
 
 func processOp(g *gocui.Gui, v *gocui.View) error {
+	status.Reset()
 	_, cy := v.Cursor()
 	grp, op := groups.FromIdx(cy)
 	if grp == nil && op == nil {
@@ -61,7 +66,7 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 		go makeRequest(g, grp, op)
 		return nil
 	}
-	f, err := form.New(g, "Parameters", maxX/2-30, maxY/2-(len(op.Params)-1)/2)
+	f, err := ui.NewForm(g, "Parameters", maxX/2-30, maxY/3-(len(op.Params)-1)/2)
 	if err != nil {
 		return err
 	}
@@ -83,7 +88,7 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 			focused = true
 			//g.SetCurrentView(v.Name())
 		}
-		if err := f.Input(form.NewInput(param.Name, 60, focused)); err != nil {
+		if err := f.Input(ui.NewInput(param.Name, 60, focused)); err != nil {
 			return err
 		}
 	}
@@ -91,14 +96,14 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 }
 
 func makeRequest(g *gocui.Gui, grp *Group, op *Operation) {
+	status.Update("Loading...")
+	result, err := op.Do(op.Params)
 	g.Update(func(g *gocui.Gui) error {
-		_, err := showInfo(g, "Loading...")
-		return errors.Wrap(err, "faliled to show info")
-	})
-	result := op.Do(op.Params)
-	g.Update(func(g *gocui.Gui) error {
-		if err := deleteView(g, "infobox"); err != nil {
-			return errors.Wrap(err, "failed to close info")
+		if err != nil {
+			status.Update("Request failed")
+			result = err.Error()
+		} else {
+			status.Update("Request successful")
 		}
 		v, err := g.SetCurrentView("main")
 		if err != nil {
@@ -152,7 +157,12 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("side", gocui.KeyEnter, gocui.ModNone, processOp); err != nil {
 		return err
 	}
-
+	if err := g.SetKeybinding("side", gocui.KeyCtrlS, gocui.ModNone, saveDialog); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("main", gocui.KeyCtrlS, gocui.ModNone, saveDialog); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -167,35 +177,35 @@ func init() {
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
 		Name: "List",
-		Do: func(params []*Param) string {
+		Do: func(params []*Param) (string, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.List(pkgName)
 			res, err := call.Do()
 			if err != nil {
-				return err.Error()
+				return "", err
 			}
 			body, err := jsoncolor.MarshalIndent(res, "", " ")
 			if err != nil {
-				return err.Error()
+				return "", err
 			}
-			return string(body)
+			return string(body), nil
 		},
 	})
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
 		Params: []*Param{{Name: "SKU"}},
-		Do: func(params []*Param) string {
+		Do: func(params []*Param) (string, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.Get(pkgName, params[0].Value)
 			res, err := call.Do()
 			if err != nil {
-				return err.Error()
+				return "", err
 			}
 			body, err := jsoncolor.MarshalIndent(res, "", " ")
 			if err != nil {
-				return err.Error()
+				return "", err
 			}
-			return string(body)
+			return string(body), nil
 		},
 	})
 	grp = &Group{Name: "Orders"}
@@ -206,26 +216,25 @@ func init() {
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
 		Params: []*Param{{Name: "SubscriptionId"}, {Name: "Token"}},
-		Do: func(params []*Param) string {
+		Do: func(params []*Param) (string, error) {
 			s := androidpublisher.NewPurchasesSubscriptionsService(service)
 			call := s.Get(pkgName, params[0].Value, params[1].Value)
 			res, err := call.Do()
 			if err != nil {
-				return err.Error()
+				return "", err
 			}
 			body, err := jsoncolor.MarshalIndent(res, "", " ")
 			if err != nil {
-				return err.Error()
+				return "", err
 			}
-			return string(body)
+			return string(body), nil
 		},
 	})
 }
 
 func layout(g *gocui.Gui) error {
-
 	maxX, maxY := g.Size()
-	if v, err := g.SetView("side", -1, 0, 30, maxY); err != nil {
+	if v, err := g.SetView("side", -1, 0, 30, maxY-2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -238,20 +247,20 @@ func layout(g *gocui.Gui) error {
 			if i == len(groups)-1 {
 				fmt.Fprint(v, "└─")
 			} else {
-				fmt.Fprint(v, "│─")
+				fmt.Fprint(v, "├─")
 			}
-			fmt.Fprintln(v, grp.Name)
+			fmt.Fprintln(v, aurora.Cyan(grp.Name))
 
 			for j, op := range grp.Operations {
 				if i != len(groups)-1 {
 					fmt.Fprint(v, "│ ")
 				} else {
-					fmt.Fprint(v, " ")
+					fmt.Fprint(v, "  ")
 				}
 				if j == len(grp.Operations)-1 {
 					fmt.Fprint(v, "└─")
 				} else {
-					fmt.Fprint(v, "│─")
+					fmt.Fprint(v, "├─")
 				}
 				fmt.Fprintln(v, op.Name)
 			}
@@ -260,13 +269,19 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 	}
-	if v, err := g.SetView("main", 30, 0, maxX, maxY); err != nil {
+	if v, err := g.SetView("main", 30, 0, maxX, maxY-2); err != nil {
 		v.Frame = true
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Wrap = true
 		v.Title = "Response"
+	}
+	defaultStatus := fmt.Sprintf("%v:Switch Panel %v:Request %v:Save Response %v:Quit %v:Navigate", aurora.Cyan("TAB"), aurora.Cyan("ENTER"), aurora.Cyan("CTRL+S"), aurora.Cyan("CTRL+C"), aurora.Cyan("↑↓"))
+	if v, err := ui.SetStatusLine(g, defaultStatus); err != nil {
+		return err
+	} else if v != nil {
+		status = v
 	}
 	return nil
 }
@@ -298,7 +313,7 @@ func do() error {
 		return err
 	}
 
-	g, err := gocui.NewGui(gocui.OutputNormal)
+	g, err := gocui.NewGui(gocui.Output256)
 	if err != nil {
 		return err
 	}
@@ -317,23 +332,42 @@ func do() error {
 	}
 	return nil
 }
-func showInfo(g *gocui.Gui, msg string) (*gocui.View, error) {
-	maxX, maxY := g.Size()
-	if v, err := g.SetView("infobox", maxX/2-20, maxY/2, maxX/2+20, maxY/2+2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return nil, err
-		}
-		v.Title = "Info"
-		fmt.Fprintln(v, msg)
-		return v, nil
-	}
-	return nil, nil
-}
 
-func deleteView(g *gocui.Gui, name string) error {
-	g.DeleteKeybindings(name)
-	if err := g.DeleteView(name); err != nil && err != gocui.ErrUnknownView {
+func saveDialog(g *gocui.Gui, v *gocui.View) error {
+	maxX, maxY := g.Size()
+	currentView := g.CurrentView()
+	f, err := ui.NewForm(g, "Save Response", maxX/2-20, maxY/2)
+	if err != nil {
 		return err
 	}
-	return nil
+	f.OnCancel(func() error {
+		_, err := g.SetCurrentView(currentView.Name())
+		return err
+	})
+	f.OnSubmit(func(values map[string]string) error {
+		filename, _ := values["File Name"]
+		if filename == "" {
+			return nil
+		}
+		v, err := g.View("main")
+		if err != nil {
+			return err
+		}
+		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(file, v)
+		if err != nil {
+			return err
+		}
+		fullPath, err := filepath.Abs(filename)
+		if err != nil {
+			return err
+		}
+		status.Update(fmt.Sprintf("File saved to %v", fullPath))
+		_, err = g.SetCurrentView(currentView.Name())
+		return err
+	})
+	return f.Input(ui.NewInput("File Name", 40, true))
 }

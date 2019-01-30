@@ -1,4 +1,4 @@
-package form
+package ui
 
 import (
 	"fmt"
@@ -8,15 +8,6 @@ import (
 	"github.com/hassansin/gocui"
 	"github.com/pkg/errors"
 )
-
-/*
-form := NewForm(title, x, y)
-form.Input(name, default, required, mask, size, focus)
-form.OnSubmit(func(){
-})
-form.OnCancel(func(){
-})
-*/
 
 //Form represents an input form
 type Form struct {
@@ -29,8 +20,8 @@ type Form struct {
 	onSubmit       func(map[string]string) error
 }
 
-//New returns a new Form
-func New(g *gocui.Gui, title string, x0, y0 int) (*Form, error) {
+//NewForm returns a new Form
+func NewForm(g *gocui.Gui, title string, x0, y0 int) (*Form, error) {
 	x1 := x0 + len(title) + 2
 	y1 := y0 + 1
 	v, err := g.SetView(fmt.Sprintf("%v", rand.Int()), x0, y0, x1, y1)
@@ -72,12 +63,12 @@ type Input struct {
 //Input adds a new input line to the form
 func (f *Form) Input(input *Input) error {
 
-	if v, err := f.g.SetView(fmt.Sprintf("%v", rand.Int()), f.x0+1, f.y1, f.x0+1+input.Cols, f.y1+input.Rows+1); err != nil {
+	if v, err := f.g.SetView(fmt.Sprintf("%v", rand.Int()), f.x0+2, f.y1, f.x0+2+input.Cols, f.y1+input.Rows+1); err != nil {
 		if err != gocui.ErrUnknownView {
 			return errors.Wrap(err, "unable to create input view")
 		}
 		v.Title = input.Name
-		v.Wrap = false
+		v.Wrap = true
 		v.Editable = true
 		v.Mask = input.Mask
 		if err := f.g.SetKeybinding(v.Name(), gocui.KeyEsc, gocui.ModNone, f.cancel); err != nil {
@@ -96,7 +87,7 @@ func (f *Form) Input(input *Input) error {
 		}
 		f.y1 = f.y1 + 3
 		if input.Cols >= f.x1-f.x0 {
-			f.x1 = f.x0 + input.Cols + 2
+			f.x1 = f.x0 + input.Cols + 4
 		}
 
 		input.view = v
@@ -110,11 +101,11 @@ func (f *Form) Input(input *Input) error {
 
 func (f *Form) close() error {
 	for _, input := range f.inputs {
-		if err := f.deleteView(input.view.Name()); err != nil {
+		if err := deleteView(f.g, input.view.Name()); err != nil {
 			return err
 		}
 	}
-	return f.deleteView(f.formView.Name())
+	return deleteView(f.g, f.formView.Name())
 }
 func (f *Form) cancel(g *gocui.Gui, v *gocui.View) error {
 	if err := f.close(); err != nil {
@@ -158,9 +149,9 @@ func (f *Form) submit(g *gocui.Gui, v *gocui.View) error {
 	return f.close()
 }
 
-func (f *Form) deleteView(name string) error {
-	f.g.DeleteKeybindings(name)
-	if err := f.g.DeleteView(name); err != nil && err != gocui.ErrUnknownView {
+func deleteView(g *gocui.Gui, name string) error {
+	g.DeleteKeybindings(name)
+	if err := g.DeleteView(name); err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 	return nil
@@ -177,26 +168,3 @@ func (f *Form) OnSubmit(fn func(map[string]string) error) *Form {
 	f.onSubmit = fn
 	return f
 }
-
-/*
-
-func showDialog(g *gocui.Gui, y int, name string) (*gocui.View, error) {
-	maxX, _ := g.Size()
-	v, err := g.SetView("input-"+name, maxX/2-30, y-1, maxX/2+30, y+1)
-	if err != nil && err != gocui.ErrUnknownView {
-		return nil, err
-	}
-	if err := g.SetKeybinding("input-"+name, gocui.KeyEnter, gocui.ModNone, inputSubmit); err != nil {
-		return nil, err
-	}
-	if err := g.SetKeybinding("input-"+name, gocui.KeyTab, gocui.ModNone, inputTab); err != nil {
-		return nil, err
-	}
-	if err := g.SetKeybinding("input-"+name, gocui.KeyEsc, gocui.ModNone, inputCancel); err != nil {
-		return nil, err
-	}
-	v.Title = name
-	v.Editable = true
-	return v, nil
-}
-*/
