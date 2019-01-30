@@ -6,13 +6,14 @@
 package main
 
 import (
-	"androidpublisher-cli/ui"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/hassansin/androidpublisher/ui"
 
 	"github.com/hassansin/gocui"
 	"github.com/logrusorgru/aurora"
