@@ -31,6 +31,5 @@ type Operation struct {
 }
 
 type Param struct {
-	Name  string
-	Value interface{}
+	Name, Value string
 }

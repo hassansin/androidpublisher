@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/jroimartin/gocui"
+	"github.com/hassansin/gocui"
 )
 
 func cursorDown(g *gocui.Gui, v *gocui.View) error {

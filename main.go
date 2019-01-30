@@ -6,13 +6,13 @@
 package main
 
 import (
+	"androidpublisher-cli/form"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"strings"
+	"os"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/jroimartin/gocui"
+	"github.com/hassansin/gocui"
 	"github.com/nwidger/jsoncolor"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -28,6 +28,13 @@ var (
 	pkgName string
 	idx     int
 )
+
+type App struct {
+	service *androidpublisher.Service
+	groups  Groups
+	pkgName string
+	idx     int
+}
 
 func nextView(g *gocui.Gui, v *gocui.View) error {
 	if v == nil || v.Name() == "side" {
@@ -49,20 +56,37 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 		//expand/collapse group
 		return nil
 	}
-	_, maxY := g.Size()
-	if len(op.Params) > 0 {
-		for i, param := range op.Params {
-			v, err := showDialog(g, maxY/2-(len(op.Params)-1)/2+i*4, param)
-			if err != nil {
-				return err
-			}
-			if i == 0 {
-				g.SetCurrentView(v.Name())
-			}
-		}
+	maxX, maxY := g.Size()
+	if len(op.Params) == 0 {
+		go makeRequest(g, grp, op)
 		return nil
 	}
-	go makeRequest(g, grp, op)
+	f, err := form.New(g, "Parameters", maxX/2-30, maxY/2-(len(op.Params)-1)/2)
+	if err != nil {
+		return err
+	}
+	f.OnCancel(func() error {
+		_, err := g.SetCurrentView("side")
+		return err
+	})
+	f.OnSubmit(func(values map[string]string) error {
+		for _, param := range op.Params {
+			param.Value = values[param.Name]
+		}
+		go makeRequest(g, grp, op)
+		return nil
+	})
+
+	for i, param := range op.Params {
+		focused := false
+		if i == 0 {
+			focused = true
+			//g.SetCurrentView(v.Name())
+		}
+		if err := f.Input(form.NewInput(param.Name, 60, focused)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -162,7 +186,7 @@ func init() {
 		Params: []*Param{{Name: "SKU"}},
 		Do: func(params []*Param) string {
 			s := androidpublisher.NewInappproductsService(service)
-			call := s.Get(pkgName, params[0].Value.(string))
+			call := s.Get(pkgName, params[0].Value)
 			res, err := call.Do()
 			if err != nil {
 				return err.Error()
@@ -184,7 +208,7 @@ func init() {
 		Params: []*Param{{Name: "SubscriptionId"}, {Name: "Token"}},
 		Do: func(params []*Param) string {
 			s := androidpublisher.NewPurchasesSubscriptionsService(service)
-			call := s.Get(pkgName, params[0].Value.(string), params[1].Value.(string))
+			call := s.Get(pkgName, params[0].Value, params[1].Value)
 			res, err := call.Do()
 			if err != nil {
 				return err.Error()
@@ -248,26 +272,35 @@ func layout(g *gocui.Gui) error {
 }
 
 func main() {
+	if err := do(); err != nil {
+		log.Println(err.Error())
+		os.Exit(1)
+	}
+}
+func do() error {
 	pkgName = viper.GetString("package")
+	if pkgName == "" {
+		return errors.New("missing android package name")
+	}
 
 	data, err := ioutil.ReadFile(viper.GetString("credentials"))
 	if err != nil {
-		log.Panicln(err)
+		return errors.Wrapf(err, "unable to read credentials (%v)", viper.GetString("credentials"))
 	}
 
 	conf, err := google.JWTConfigFromJSON(data, androidpublisher.AndroidpublisherScope)
 	if err != nil {
-		log.Panicln(err)
+		return err
 	}
 	client := conf.Client(oauth2.NoContext)
 	service, err = androidpublisher.New(client)
 	if err != nil {
-		log.Panicln(err)
+		return err
 	}
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
-		log.Panicln(err)
+		return err
 	}
 	defer g.Close()
 	g.InputEsc = true
@@ -276,14 +309,14 @@ func main() {
 	g.SetManagerFunc(layout)
 
 	if err := keybindings(g); err != nil {
-		log.Panicln(err)
+		return err
 	}
 
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-		log.Panicln(err)
+		return err
 	}
+	return nil
 }
-
 func showInfo(g *gocui.Gui, msg string) (*gocui.View, error) {
 	maxX, maxY := g.Size()
 	if v, err := g.SetView("infobox", maxX/2-20, maxY/2, maxX/2+20, maxY/2+2); err != nil {
@@ -303,117 +336,4 @@ func deleteView(g *gocui.Gui, name string) error {
 		return err
 	}
 	return nil
-}
-
-func inputSubmit(g *gocui.Gui, v *gocui.View) error {
-	sv, err := g.View("side")
-	if err != nil {
-		return errors.Wrap(err, "unabled to get side view")
-	}
-	_, cy := sv.Cursor()
-	grp, op := groups.FromIdx(cy)
-	if grp == nil || op == nil {
-		return nil
-	}
-
-	for _, param := range op.Params {
-		pv, err := g.View("input-" + param.Name)
-		if err != nil {
-			return errors.Wrapf(err, "unabled to get input-%v view", param.Name)
-		}
-		spew.Dump(pv.Buffer())
-		param.Value = strings.TrimSpace(pv.Buffer())
-		if err := deleteView(g, pv.Name()); err != nil {
-			return err
-		}
-	}
-
-	go makeRequest(g, grp, op)
-	return nil
-}
-
-func inputTab(g *gocui.Gui, v *gocui.View) error {
-	var first *gocui.View
-	var found bool
-	for _, vv := range g.Views() {
-		if !strings.Contains(vv.Name(), "input-") {
-			continue
-		}
-		if first == nil {
-			first = vv
-		}
-		if vv.Name() == v.Name() {
-			found = true
-			continue
-		}
-		if found {
-			_, err := g.SetCurrentView(vv.Name())
-			return err
-		}
-	}
-	if first != nil {
-		_, err := g.SetCurrentView(first.Name())
-		return err
-	}
-	return nil
-}
-
-func inputCancel(g *gocui.Gui, v *gocui.View) error {
-	for _, v := range g.Views() {
-		if !strings.Contains(v.Name(), "input-") {
-			continue
-		}
-		if err := deleteView(g, v.Name()); err != nil {
-			return err
-		}
-	}
-	_, err := g.SetCurrentView("side")
-	return err
-}
-
-func showDialog(g *gocui.Gui, y int, param *Param) (*gocui.View, error) {
-	maxX, _ := g.Size()
-	v, err := g.SetView("input-"+param.Name, maxX/2-30, y-1, maxX/2+30, y+1)
-	if err != nil && err != gocui.ErrUnknownView {
-		return nil, err
-	}
-	if err := g.SetKeybinding("input-"+param.Name, gocui.KeyEnter, gocui.ModNone, inputSubmit); err != nil {
-		return nil, err
-	}
-	if err := g.SetKeybinding("input-"+param.Name, gocui.KeyTab, gocui.ModNone, inputTab); err != nil {
-		return nil, err
-	}
-	if err := g.SetKeybinding("input-"+param.Name, gocui.KeyEsc, gocui.ModNone, inputCancel); err != nil {
-		return nil, err
-	}
-	v.Title = param.Name
-	v.Editable = true
-	v.Editor = gocui.EditorFunc(simpleEditor)
-	v.Wrap = false
-	return v, nil
-}
-
-func simpleEditor(v *gocui.View, key gocui.Key, ch rune, mod gocui.Modifier) {
-	switch {
-	case ch != 0 && mod == 0:
-		v.EditWrite(ch)
-	case key == gocui.KeySpace:
-		v.EditWrite(' ')
-	case key == gocui.KeyBackspace || key == gocui.KeyBackspace2:
-		v.EditDelete(true)
-	case key == gocui.KeyDelete:
-		v.EditDelete(false)
-	case key == gocui.KeyInsert:
-		v.Overwrite = !v.Overwrite
-	case key == gocui.KeyEnter:
-		v.EditNewLine()
-	case key == gocui.KeyArrowDown:
-		v.MoveCursor(0, 1, false)
-	case key == gocui.KeyArrowUp:
-		v.MoveCursor(0, -1, false)
-	case key == gocui.KeyArrowLeft:
-		v.MoveCursor(-1, 0, false)
-	case key == gocui.KeyArrowRight:
-		v.MoveCursor(1, 0, false)
-	}
 }
