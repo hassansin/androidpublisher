@@ -3,9 +3,11 @@ package ui
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 
 	"github.com/hassansin/gocui"
+	"github.com/logrusorgru/aurora"
 	"github.com/pkg/errors"
 )
 
@@ -24,6 +26,7 @@ type Form struct {
 func NewForm(g *gocui.Gui, title string, x0, y0 int) (*Form, error) {
 	x1 := x0 + len(title) + 2
 	y1 := y0 + 1
+
 	v, err := g.SetView(fmt.Sprintf("%v", rand.Int()), x0, y0, x1, y1)
 	if err != nil && err != gocui.ErrUnknownView {
 		return nil, errors.Wrap(err, "unable to create form view")
@@ -85,7 +88,7 @@ func (f *Form) Input(input *Input) error {
 				return err
 			}
 		}
-		f.y1 = f.y1 + 3
+		f.y1 = f.y1 + 4
 		if input.Cols >= f.x1-f.x0 {
 			f.x1 = f.x0 + input.Cols + 4
 		}
@@ -95,6 +98,7 @@ func (f *Form) Input(input *Input) error {
 		if _, err := f.g.SetView(f.formView.Name(), f.x0, f.y0, f.x1, f.y1); err != nil {
 			return err
 		}
+		f.setFooter()
 	}
 	return nil
 }
@@ -167,4 +171,34 @@ func (f *Form) OnCancel(fn func() error) *Form {
 func (f *Form) OnSubmit(fn func(map[string]string) error) *Form {
 	f.onSubmit = fn
 	return f
+}
+
+func (f *Form) setFooter() {
+	v := f.formView
+	v.Clear()
+	x, y := v.Size()
+	var msg string
+	if len(f.inputs) > 1 {
+		msg = msg + fmt.Sprintf("%v:Switch Input ", aurora.Cyan("TAB"))
+	}
+	msg = msg + fmt.Sprintf("%v:Submit %v:Cancel", aurora.Cyan("ENTER"), aurora.Cyan("ESC"))
+
+	for i := 0; i < y; i++ {
+		fmt.Fprintln(v)
+	}
+	if x < len(Strip(msg)) {
+		fmt.Fprintln(v, msg)
+	}
+	for i := 0; i < (x-len(Strip(msg)))/2; i++ {
+		fmt.Fprint(v, " ")
+	}
+	fmt.Fprint(v, msg)
+}
+
+const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+
+var re = regexp.MustCompile(ansi)
+
+func Strip(str string) string {
+	return re.ReplaceAllString(str, "")
 }

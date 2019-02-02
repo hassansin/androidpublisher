@@ -1,13 +1,7 @@
-// Copyright 2014 The gocui Authors. All rights reserved.
-
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package main
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,7 +11,6 @@ import (
 
 	"github.com/hassansin/gocui"
 	"github.com/logrusorgru/aurora"
-	"github.com/nwidger/jsoncolor"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -27,11 +20,13 @@ import (
 )
 
 var (
-	service *androidpublisher.Service
-	status  *ui.StatusLine
-	groups  Groups
-	pkgName string
-	idx     int
+	service       *androidpublisher.Service
+	status        *ui.StatusLine
+	mainView      *ui.MainView
+	groups        Groups
+	pkgName       string
+	idx           int
+	defaultStatus = fmt.Sprintf("%v:Switch Panel %v:Request %v:Save Response %v:Quit %v:Navigate", aurora.Cyan("TAB"), aurora.Cyan("ENTER"), aurora.Cyan("CTRL+S"), aurora.Cyan("CTRL+C"), aurora.Cyan("↑↓"))
 )
 
 type App struct {
@@ -43,8 +38,7 @@ type App struct {
 
 func nextView(g *gocui.Gui, v *gocui.View) error {
 	if v == nil || v.Name() == "side" {
-		_, err := g.SetCurrentView("main")
-		return err
+		return mainView.SetCurrent()
 	}
 	_, err := g.SetCurrentView("side")
 	return err
@@ -80,7 +74,8 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 			param.Value = values[param.Name]
 		}
 		go makeRequest(g, grp, op)
-		return nil
+		_, err := g.SetCurrentView("side")
+		return err
 	})
 
 	for i, param := range op.Params {
@@ -101,21 +96,12 @@ func makeRequest(g *gocui.Gui, grp *Group, op *Operation) {
 	result, err := op.Do(op.Params)
 	g.Update(func(g *gocui.Gui) error {
 		if err != nil {
-			status.Update("Request failed")
-			result = err.Error()
+			status.UpdateError("Request failed")
+			result = err
 		} else {
-			status.Update("Request successful")
+			status.UpdateSuccess("Request successful")
 		}
-		v, err := g.SetCurrentView("main")
-		if err != nil {
-			return errors.Wrap(err, "failed to current view to main")
-		}
-		v.Title = fmt.Sprintf("Response(%v %v)", op.Name, grp.Name)
-		v.Clear()
-		v.SetCursor(0, 0)
-		v.SetOrigin(0, 0)
-		fmt.Fprintf(v, result)
-		g.SetCurrentView("side")
+		mainView.LoadContent(op.Name+" "+grp.Name, result)
 		return nil
 	})
 }
@@ -134,10 +120,16 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("side", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
 		return err
 	}
+	if err := g.SetKeybinding("side", 'j', gocui.ModNone, cursorDown); err != nil {
+		return err
+	}
 	if err := g.SetKeybinding("main", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("side", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("side", 'k', gocui.ModNone, cursorUp); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("main", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
@@ -149,7 +141,10 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("main", gocui.KeyArrowRight, gocui.ModNone, cursorRight); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("main", gocui.KeyPgdn, gocui.ModNone, cursorEnd); err != nil {
+	if err := g.SetKeybinding("main", gocui.KeyPgdn, gocui.ModNone, pageDown); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("main", gocui.KeyPgup, gocui.ModNone, pageUp); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
@@ -178,35 +173,19 @@ func init() {
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
 		Name: "List",
-		Do: func(params []*Param) (string, error) {
+		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.List(pkgName)
-			res, err := call.Do()
-			if err != nil {
-				return "", err
-			}
-			body, err := jsoncolor.MarshalIndent(res, "", " ")
-			if err != nil {
-				return "", err
-			}
-			return string(body), nil
+			return call.Do()
 		},
 	})
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
 		Params: []*Param{{Name: "SKU"}},
-		Do: func(params []*Param) (string, error) {
+		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.Get(pkgName, params[0].Value)
-			res, err := call.Do()
-			if err != nil {
-				return "", err
-			}
-			body, err := jsoncolor.MarshalIndent(res, "", " ")
-			if err != nil {
-				return "", err
-			}
-			return string(body), nil
+			return call.Do()
 		},
 	})
 	grp = &Group{Name: "Orders"}
@@ -217,74 +196,63 @@ func init() {
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
 		Params: []*Param{{Name: "SubscriptionId"}, {Name: "Token"}},
-		Do: func(params []*Param) (string, error) {
+		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewPurchasesSubscriptionsService(service)
 			call := s.Get(pkgName, params[0].Value, params[1].Value)
-			res, err := call.Do()
-			if err != nil {
-				return "", err
-			}
-			body, err := jsoncolor.MarshalIndent(res, "", " ")
-			if err != nil {
-				return "", err
-			}
-			return string(body), nil
+			return call.Do()
 		},
 	})
 }
 
-func layout(g *gocui.Gui) error {
-	maxX, maxY := g.Size()
-	if v, err := g.SetView("side", -1, 0, 30, maxY-2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		v.Highlight = true
-		v.Frame = true
-		v.Title = "Operations"
-		v.SelBgColor = gocui.ColorGreen
-		v.SelFgColor = gocui.ColorBlack
-		for i, grp := range groups {
-			if i == len(groups)-1 {
-				fmt.Fprint(v, "└─")
-			} else {
-				fmt.Fprint(v, "├─")
+func createLayout(g *gocui.Gui) func(*gocui.Gui) error {
+	status = ui.NewStatusLine(g)
+	mainView = ui.NewMainView(g)
+	return func(g *gocui.Gui) error {
+		_, maxY := g.Size()
+		if v, err := g.SetView("side", -1, 0, 30, maxY-2); err != nil {
+			if err != gocui.ErrUnknownView {
+				return err
 			}
-			fmt.Fprintln(v, aurora.Cyan(grp.Name))
-
-			for j, op := range grp.Operations {
-				if i != len(groups)-1 {
-					fmt.Fprint(v, "│ ")
-				} else {
-					fmt.Fprint(v, "  ")
-				}
-				if j == len(grp.Operations)-1 {
+			v.Highlight = true
+			v.Frame = true
+			v.Title = "Operations"
+			v.SelBgColor = gocui.ColorGreen
+			v.SelFgColor = gocui.ColorBlack
+			for i, grp := range groups {
+				if i == len(groups)-1 {
 					fmt.Fprint(v, "└─")
 				} else {
 					fmt.Fprint(v, "├─")
 				}
-				fmt.Fprintln(v, op.Name)
+				fmt.Fprintln(v, aurora.Cyan(grp.Name))
+
+				for j, op := range grp.Operations {
+					if i != len(groups)-1 {
+						fmt.Fprint(v, "│ ")
+					} else {
+						fmt.Fprint(v, "  ")
+					}
+					if j == len(grp.Operations)-1 {
+						fmt.Fprint(v, "└─")
+					} else {
+						fmt.Fprint(v, "├─")
+					}
+					fmt.Fprintln(v, op.Name)
+				}
+			}
+			if _, err := g.SetCurrentView("side"); err != nil {
+				return err
 			}
 		}
-		if _, err := g.SetCurrentView("side"); err != nil {
+		if err := mainView.SetView(); err != nil {
 			return err
 		}
-	}
-	if v, err := g.SetView("main", 30, 0, maxX, maxY-2); err != nil {
-		v.Frame = true
-		if err != gocui.ErrUnknownView {
+
+		if err := status.SetView(defaultStatus); err != nil {
 			return err
 		}
-		v.Wrap = true
-		v.Title = "Response"
+		return nil
 	}
-	defaultStatus := fmt.Sprintf("%v:Switch Panel %v:Request %v:Save Response %v:Quit %v:Navigate", aurora.Cyan("TAB"), aurora.Cyan("ENTER"), aurora.Cyan("CTRL+S"), aurora.Cyan("CTRL+C"), aurora.Cyan("↑↓"))
-	if v, err := ui.SetStatusLine(g, defaultStatus); err != nil {
-		return err
-	} else if v != nil {
-		status = v
-	}
-	return nil
 }
 
 func main() {
@@ -322,7 +290,7 @@ func do() error {
 	g.InputEsc = true
 	g.Cursor = true
 
-	g.SetManagerFunc(layout)
+	g.SetManagerFunc(createLayout(g))
 
 	if err := keybindings(g); err != nil {
 		return err
@@ -350,25 +318,16 @@ func saveDialog(g *gocui.Gui, v *gocui.View) error {
 		if filename == "" {
 			return nil
 		}
-		v, err := g.View("main")
-		if err != nil {
-			return err
-		}
-		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(file, v)
-		if err != nil {
-			return err
+		if err := mainView.SaveContent(filename); err != nil {
+			status.UpdateError(fmt.Sprintf("Unable to save response: %v", err.Error()))
+			return nil
 		}
 		fullPath, err := filepath.Abs(filename)
 		if err != nil {
 			return err
 		}
-		status.Update(fmt.Sprintf("File saved to %v", fullPath))
-		_, err = g.SetCurrentView(currentView.Name())
-		return err
+		status.UpdateSuccess(fmt.Sprintf("File saved to %v", fullPath))
+		return nil
 	})
 	return f.Input(ui.NewInput("File Name", 40, true))
 }

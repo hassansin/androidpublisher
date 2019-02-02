@@ -4,39 +4,45 @@ import (
 	"fmt"
 
 	"github.com/hassansin/gocui"
+	"github.com/logrusorgru/aurora"
 	"github.com/pkg/errors"
 )
 
 const StatusView = "status-line"
 
 type StatusLine struct {
-	g   *gocui.Gui
-	v   *gocui.View
-	msg string
+	g      *gocui.Gui
+	v      *gocui.View
+	height int
+	msg    string
+}
+
+func NewStatusLine(g *gocui.Gui) *StatusLine {
+	return &StatusLine{
+		g:      g,
+		height: 2,
+	}
 }
 
 //SetStatusLine returns new StatusLine
-func SetStatusLine(g *gocui.Gui, msg string) (*StatusLine, error) {
-	maxX, maxY := g.Size()
-	height := 2
-	if v, err := g.SetView(StatusView, -1, maxY-height, maxX, maxY); err != nil {
+func (s *StatusLine) SetView(msg string) error {
+	maxX, maxY := s.g.Size()
+	if v, err := s.g.SetView(StatusView, -1, maxY-s.height, maxX, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
-			return nil, errors.Wrap(err, "unable to create status line view")
+			return errors.Wrap(err, "unable to create status line view")
 		}
 		v.Frame = false
 		//v.BgColor = gocui.ColorDefault | gocui.AttrReverse
 		//v.FgColor = gocui.ColorDefault | gocui.AttrReverse
 		fmt.Fprintln(v, msg)
-		if _, err = g.SetViewOnTop(v.Name()); err != nil {
-			return nil, errors.Wrap(err, "unable to set top view")
+		if _, err = s.g.SetViewOnTop(v.Name()); err != nil {
+			return errors.Wrap(err, "unable to set top view")
 		}
-		return &StatusLine{
-			v:   v,
-			g:   g,
-			msg: msg,
-		}, nil
+		s.v = v
+		s.msg = msg
+		return nil
 	}
-	return nil, nil
+	return nil
 }
 
 func (s *StatusLine) Update(msg string) {
@@ -45,6 +51,13 @@ func (s *StatusLine) Update(msg string) {
 		fmt.Fprint(s.v, msg)
 		return nil
 	})
+}
+
+func (s *StatusLine) UpdateSuccess(msg string) {
+	s.Update(fmt.Sprint(aurora.Green(msg)))
+}
+func (s *StatusLine) UpdateError(msg string) {
+	s.Update(fmt.Sprint(aurora.Red(msg)))
 }
 
 func (s *StatusLine) Reset() {
