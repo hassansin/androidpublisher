@@ -1,4 +1,4 @@
-#androidpublisher
+# androidpublisher
 
 CLI app to interact with Google Play Developer API
 
@@ -19,6 +19,7 @@ androidpublisher --package com.example.android --credentials "path to service ac
 
 ## Screenshots
 
+![screenshot](https://raw.githubusercontent.com/hassansin/androidpublisher/master/screenshot.png?token=AEZ3PJXoMcMFr0L1pFTrGJpGErkdI2S6ks5cWGhPwA%3D%3D)
 
 ### TODO
 
