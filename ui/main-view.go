@@ -3,27 +3,36 @@ package ui
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/hassansin/gocui"
 	"github.com/nwidger/jsoncolor"
 	"github.com/pkg/errors"
 )
 
+var r = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 type MainView struct {
 	*gocui.View
 	g    *gocui.Gui
+	name string
 	body interface{}
 }
 
 func NewMainView(g *gocui.Gui) *MainView {
 	return &MainView{
-		g: g,
+		g:    g,
+		name: fmt.Sprintf("main-%v", r.Int()),
 	}
+}
+func (m *MainView) Name() string {
+	return m.name
 }
 func (m *MainView) SetView() error {
 	maxX, maxY := m.g.Size()
-	if v, err := m.g.SetView("main", 30, 0, maxX, maxY-2); err != nil {
+	if v, err := m.g.SetView(m.Name(), 30, 0, maxX, maxY-2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}

@@ -8,26 +8,26 @@ import (
 	"github.com/pkg/errors"
 )
 
-const StatusView = "status-line"
-
 type StatusLine struct {
 	g      *gocui.Gui
 	v      *gocui.View
 	height int
 	msg    string
+	name   string
 }
 
 func NewStatusLine(g *gocui.Gui) *StatusLine {
 	return &StatusLine{
 		g:      g,
 		height: 2,
+		name:   fmt.Sprintf("status-%v", r.Int()),
 	}
 }
 
 //SetStatusLine returns new StatusLine
 func (s *StatusLine) SetView(msg string) error {
 	maxX, maxY := s.g.Size()
-	if v, err := s.g.SetView(StatusView, -1, maxY-s.height, maxX, maxY); err != nil {
+	if v, err := s.g.SetView(s.name, -1, maxY-s.height, maxX, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return errors.Wrap(err, "unable to create status line view")
 		}

@@ -11,6 +11,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+
+var re = regexp.MustCompile(ansi)
+
 //Form represents an input form
 type Form struct {
 	g              *gocui.Gui
@@ -186,19 +190,15 @@ func (f *Form) setFooter() {
 	for i := 0; i < y; i++ {
 		fmt.Fprintln(v)
 	}
-	if x < len(Strip(msg)) {
+	if x < len(strip(msg)) {
 		fmt.Fprintln(v, msg)
 	}
-	for i := 0; i < (x-len(Strip(msg)))/2; i++ {
+	for i := 0; i < (x-len(strip(msg)))/2; i++ {
 		fmt.Fprint(v, " ")
 	}
 	fmt.Fprint(v, msg)
 }
 
-const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
-
-var re = regexp.MustCompile(ansi)
-
-func Strip(str string) string {
+func strip(str string) string {
 	return re.ReplaceAllString(str, "")
 }
