@@ -24,6 +24,7 @@ type Form struct {
 	inputs         []*Input
 	onCancel       func() error
 	onSubmit       func(map[string]string) error
+	onError        func(error)
 }
 
 //NewForm returns a new Form
@@ -147,7 +148,12 @@ func (f *Form) next(g *gocui.Gui, v *gocui.View) error {
 func (f *Form) submit(g *gocui.Gui, v *gocui.View) error {
 	values := make(map[string]string)
 	for _, input := range f.inputs {
-		values[input.Name] = strings.TrimSpace(input.view.Buffer())
+		value := strings.TrimSpace(input.view.Buffer())
+		if input.Required && value == "" && f.onError != nil {
+			f.onError(errors.Errorf("missing %v parameter", input.Name))
+			return nil
+		}
+		values[input.Name] = value
 	}
 	if f.onSubmit != nil {
 		if err := f.onSubmit(values); err != nil {
@@ -174,6 +180,11 @@ func (f *Form) OnCancel(fn func() error) *Form {
 //OnSubmit binds function to be called when form is submitted
 func (f *Form) OnSubmit(fn func(map[string]string) error) *Form {
 	f.onSubmit = fn
+	return f
+}
+
+func (f *Form) OnError(fn func(error)) *Form {
+	f.onError = fn
 	return f
 }
 

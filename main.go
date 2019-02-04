@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/hassansin/androidpublisher/ui"
 
@@ -53,22 +55,23 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 	}
 	f.OnCancel(func() error {
 		return sideView.SetCurrent()
-	})
-	f.OnSubmit(func(values map[string]string) error {
+	}).OnError(func(err error) {
+		status.UpdateError(err.Error())
+	}).OnSubmit(func(values map[string]string) error {
 		for _, param := range op.Params {
 			param.Value = values[param.Name]
 		}
 		go makeRequest(g, grp, op)
 		return sideView.SetCurrent()
 	})
-
 	for i, param := range op.Params {
 		focused := false
 		if i == 0 {
 			focused = true
-			//g.SetCurrentView(v.Name())
 		}
-		if err := f.Input(ui.NewInput(param.Name, 60, focused)); err != nil {
+		input := ui.NewInput(param.Name, 60, focused)
+		input.Required = param.Required
+		if err := f.Input(input); err != nil {
 			return err
 		}
 	}
@@ -187,7 +190,7 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 	})
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
-		Params: []*Param{{Name: "SKU"}},
+		Params: []*Param{{Name: "SKU", Required: true}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.Get(pkgName, params[0].Value)
@@ -196,15 +199,87 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 	})
 	grp = &Group{Name: "Orders"}
 	groups = append(groups, grp)
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Refund",
+		Params: []*Param{{Name: "OrderID", Required: true}, {Name: "Revoke (true/false)"}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewOrdersService(service)
+			call := s.Refund(pkgName, params[0].Value)
+			if strings.ToLower(params[1].Value) == "true" {
+				call.Revoke(true)
+			}
+			return nil, call.Do()
+		},
+	})
 
+	grp = &Group{Name: "Purchases.products"}
+	groups = append(groups, grp)
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Get",
+		Params: []*Param{{Name: "ProductID", Required: true}, {Name: "Token", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewPurchasesProductsService(service)
+			call := s.Get(pkgName, params[0].Value, params[1].Value)
+			return call.Do()
+		},
+	})
 	grp = &Group{Name: "Purchases.subscriptions"}
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
-		Params: []*Param{{Name: "SubscriptionId"}, {Name: "Token"}},
+		Params: []*Param{{Name: "SubscriptionId", Required: true}, {Name: "Token", Required: true}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewPurchasesSubscriptionsService(service)
 			call := s.Get(pkgName, params[0].Value, params[1].Value)
+			return call.Do()
+		},
+	})
+
+	grp = &Group{Name: "Purchases.voidedpurchases"}
+	groups = append(groups, grp)
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "List",
+		Params: []*Param{{Name: "StartTime(milliseconds)"}, {Name: "EndTime(milliseconds)"}, {Name: "MaxResults"}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewPurchasesVoidedpurchasesService(service)
+			call := s.List(pkgName)
+			if params[0].Value != "" {
+				ms, _ := strconv.ParseInt(params[0].Value, 10, 64)
+				call.StartTime(ms)
+			}
+			if params[1].Value != "" {
+				ms, _ := strconv.ParseInt(params[1].Value, 10, 64)
+				call.EndTime(ms)
+			}
+			if params[2].Value != "" {
+				v, _ := strconv.ParseInt(params[2].Value, 10, 64)
+				call.MaxResults(v)
+			}
+			return call.Do()
+		},
+	})
+
+	grp = &Group{Name: "Reviews"}
+	groups = append(groups, grp)
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "List",
+		Params: []*Param{{Name: "MaxResults"}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewReviewsService(service)
+			call := s.List(pkgName)
+			if params[0].Value != "" {
+				v, _ := strconv.ParseInt(params[0].Value, 10, 64)
+				call.MaxResults(v)
+			}
+			return call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Get",
+		Params: []*Param{{Name: "ReviewID", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewReviewsService(service)
+			call := s.Get(pkgName, params[0].Value)
 			return call.Do()
 		},
 	})

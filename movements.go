@@ -1,11 +1,17 @@
 package main
 
 import (
+	"github.com/hassansin/androidpublisher/ui"
 	"github.com/hassansin/gocui"
 )
 
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
+	if v == nil {
+		return nil
+	}
+	if v.Name() == sideView.Name() {
+		sideView.MoveCursor(ui.Down)
+	} else {
 		v.MoveCursor(0, 1, false)
 	}
 	status.Reset()
@@ -13,7 +19,12 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 }
 
 func cursorUp(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
+	if v == nil {
+		return nil
+	}
+	if v.Name() == sideView.Name() {
+		sideView.MoveCursor(ui.Up)
+	} else {
 		v.MoveCursor(0, -1, false)
 	}
 	status.Reset()

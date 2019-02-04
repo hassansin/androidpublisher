@@ -45,4 +45,5 @@ func (op Operation) Children() []ui.Node {
 
 type Param struct {
 	Name, Value string
+	Required    bool
 }

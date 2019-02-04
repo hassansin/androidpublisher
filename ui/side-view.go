@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/hassansin/gocui"
+	"github.com/logrusorgru/aurora"
 	"github.com/pkg/errors"
 )
 
@@ -13,10 +14,14 @@ type Node interface {
 	Children() []Node
 }
 
+type Dir bool
+
 const (
-	pipe   = "│ "
-	middle = "├─"
-	last   = "└─"
+	pipe       = "│ "
+	middle     = "├─"
+	last       = "└─"
+	Up     Dir = true
+	Down   Dir = false
 )
 
 type TreeView struct {
@@ -71,6 +76,24 @@ func (m TreeView) Selected() []int {
 	return indexes
 }
 
+func (m *TreeView) MoveCursor(dir Dir) {
+	x, y := m.View.Cursor()
+	lines := len(m.View.BufferLines())
+	if dir == Up {
+		if y == 0 {
+			m.View.SetCursor(x, lines-1)
+			return
+		}
+		m.View.MoveCursor(0, -1, false)
+	} else {
+		if y == lines-1 {
+			m.View.SetCursor(x, 0)
+			return
+		}
+		m.View.MoveCursor(0, 1, false)
+	}
+}
+
 func Tree(nodes []Node, prefix string) string {
 	var result string
 	for i, node := range nodes {
@@ -83,7 +106,11 @@ func Tree(nodes []Node, prefix string) string {
 			result += prefix + middle
 			prefixChild += pipe
 		}
-		result += node.Title() + "\n"
+		if len(node.Children()) == 0 {
+			result += fmt.Sprintf("%v\n", aurora.Bold(node.Title()))
+		} else {
+			result += node.Title() + "\n"
+		}
 		result += Tree(node.Children(), prefixChild)
 	}
 	return result
