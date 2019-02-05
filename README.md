@@ -4,6 +4,11 @@ CLI app to interact with Google Play Developer API
 
 ## Installation 
 
+### Pre-built binaries
+
+See [releases](https://github.com/hassansin/androidpublisher/releases)
+
+### From Source
 ```sh
 go install github.com/hassansin/androidpublisher
 ```
