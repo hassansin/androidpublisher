@@ -76,6 +76,9 @@ func (f *Form) Input(input *Input) error {
 			return errors.Wrap(err, "unable to create input view")
 		}
 		v.Title = input.Name
+		if input.Required {
+			v.Title = fmt.Sprintf("*%v", input.Name)
+		}
 		v.Wrap = true
 		v.Editable = true
 		v.Mask = input.Mask
