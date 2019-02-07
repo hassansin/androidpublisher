@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hassansin/androidpublisher/movements"
 	"github.com/hassansin/androidpublisher/ui"
 
 	"github.com/hassansin/gocui"
@@ -128,10 +129,16 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding(mainView.Name(), gocui.KeyArrowRight, gocui.ModNone, cursorRight); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyPgdn, gocui.ModNone, pageDown); err != nil {
+	if err := g.SetKeybinding(mainView.Name(), gocui.KeyPgdn, gocui.ModNone, movements.PgDn); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyPgup, gocui.ModNone, pageUp); err != nil {
+	if err := g.SetKeybinding(mainView.Name(), gocui.KeyPgup, gocui.ModNone, movements.PgUp); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlH, gocui.ModNone, movements.Home); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlE, gocui.ModNone, movements.End); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
