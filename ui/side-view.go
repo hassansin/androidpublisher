@@ -44,7 +44,7 @@ func (m *TreeView) Name() string {
 func (m *TreeView) SetView(title string, nodes []Node) error {
 	m.nodes = nodes
 	_, maxY := m.g.Size()
-	if v, err := m.g.SetView(m.Name(), -1, 0, 30, maxY-2); err != nil {
+	if v, err := m.g.SetView(m.Name(), 0, 0, 29, maxY-2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}

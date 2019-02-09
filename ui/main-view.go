@@ -32,7 +32,7 @@ func (m *MainView) Name() string {
 }
 func (m *MainView) SetView() error {
 	maxX, maxY := m.g.Size()
-	if v, err := m.g.SetView(m.Name(), 30, 0, maxX, maxY-2); err != nil {
+	if v, err := m.g.SetView(m.Name(), 30, 0, maxX-1, maxY-2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}

@@ -71,6 +71,9 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 			focused = true
 		}
 		input := ui.NewInput(param.Name, 60, focused)
+		if param.Multiline {
+			input.Rows = 6
+		}
 		input.Required = param.Required
 		if err := f.Input(input); err != nil {
 			return err
@@ -188,10 +191,14 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 	grp := &Group{Name: "Inappproducts"}
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
-		Name: "List",
+		Name:   "List",
+		Params: []*Param{{Name: "PageToken"}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.List(pkgName)
+			if params[0].Value != "" {
+				call.Token(params[0].Value)
+			}
 			return call.Do()
 		},
 	})
@@ -246,7 +253,7 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "List",
-		Params: []*Param{{Name: "StartTime(milliseconds)"}, {Name: "EndTime(milliseconds)"}, {Name: "MaxResults"}},
+		Params: []*Param{{Name: "StartTime(milliseconds)"}, {Name: "EndTime(milliseconds)"}, {Name: "MaxResults"}, {Name: "PageToken"}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewPurchasesVoidedpurchasesService(service)
 			call := s.List(pkgName)
@@ -262,6 +269,9 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 				v, _ := strconv.ParseInt(params[2].Value, 10, 64)
 				call.MaxResults(v)
 			}
+			if params[3].Value != "" {
+				call.Token(params[3].Value)
+			}
 			return call.Do()
 		},
 	})
@@ -270,13 +280,16 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "List",
-		Params: []*Param{{Name: "MaxResults"}},
+		Params: []*Param{{Name: "MaxResults"}, {Name: "PageToken"}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewReviewsService(service)
 			call := s.List(pkgName)
 			if params[0].Value != "" {
 				v, _ := strconv.ParseInt(params[0].Value, 10, 64)
 				call.MaxResults(v)
+			}
+			if params[1].Value != "" {
+				call.Token(params[1].Value)
 			}
 			return call.Do()
 		},
@@ -352,6 +365,9 @@ func do() error {
 	defer g.Close()
 	g.InputEsc = true
 	g.Cursor = true
+	g.Highlight = true
+	g.FgColor = gocui.ColorDefault
+	g.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 
 	g.SetManagerFunc(createLayout(g))
 
