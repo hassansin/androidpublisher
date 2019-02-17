@@ -144,9 +144,6 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlE, gocui.ModNone, movements.End); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-		return err
-	}
 	if err := g.SetKeybinding(sideView.Name(), gocui.KeyEnter, gocui.ModNone, processOp); err != nil {
 		return err
 	}
@@ -154,6 +151,9 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlS, gocui.ModNone, saveDialog); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		return err
 	}
 	return nil

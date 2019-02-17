@@ -9,21 +9,26 @@ import (
 	"github.com/pkg/errors"
 )
 
+//Node - represents an item in Tree view
 type Node interface {
 	Title() string
 	Children() []Node
 }
 
+//Dir - direction type
 type Dir bool
 
 const (
-	pipe       = "│ "
-	middle     = "├─"
-	last       = "└─"
-	Up     Dir = true
-	Down   Dir = false
+	pipe   = "│ "
+	middle = "├─"
+	last   = "└─"
+	//Up direction
+	Up Dir = true
+	//Down direction
+	Down Dir = false
 )
 
+//TreeView - generates a directory tree-like view
 type TreeView struct {
 	*gocui.View
 	nodes []Node
@@ -31,16 +36,20 @@ type TreeView struct {
 	name  string
 }
 
+//NewTreeView - constructor for TreeView
 func NewTreeView(g *gocui.Gui) *TreeView {
 	return &TreeView{
 		g:    g,
 		name: fmt.Sprintf("tree-%v", r.Int()),
 	}
 }
+
+//Name return view name
 func (m *TreeView) Name() string {
 	return m.name
 }
 
+//SetView initializes the view
 func (m *TreeView) SetView(title string, nodes []Node) error {
 	m.nodes = nodes
 	_, maxY := m.g.Size()
@@ -53,6 +62,7 @@ func (m *TreeView) SetView(title string, nodes []Node) error {
 		v.Title = title
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
+		v.HideCursor = true
 		fmt.Fprint(v, strings.TrimSpace(Tree(nodes, "")))
 		if _, err := m.g.SetCurrentView(m.name); err != nil {
 			return err
@@ -62,11 +72,13 @@ func (m *TreeView) SetView(title string, nodes []Node) error {
 	return nil
 }
 
+//SetCurrent sets this view as current
 func (m *TreeView) SetCurrent() error {
 	_, err := m.g.SetCurrentView(m.View.Name())
 	return errors.Wrap(err, "failed to current view")
 }
 
+//Selected returns items that are currently selected/hightlighted in the view
 func (m TreeView) Selected() []int {
 	_, y := m.View.Cursor()
 	indexes := Selected(m.nodes, &y)
@@ -76,6 +88,7 @@ func (m TreeView) Selected() []int {
 	return indexes
 }
 
+//MoveCursor moves cursor up/down in the tree view
 func (m *TreeView) MoveCursor(dir Dir) {
 	x, y := m.View.Cursor()
 	lines := len(m.View.BufferLines())
