@@ -5,11 +5,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/hassansin/androidpublisher/movements"
 	"github.com/hassansin/androidpublisher/ui"
 
 	"github.com/hassansin/gocui"
@@ -102,55 +100,19 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func keybindings(g *gocui.Gui) error {
+	if err := mainView.SetKeybinding(); err != nil {
+		return err
+	}
+	if err := sideView.SetKeybinding(); err != nil {
+		return err
+	}
 	if err := g.SetKeybinding(sideView.Name(), gocui.KeyTab, gocui.ModNone, nextView); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding(mainView.Name(), gocui.KeyTab, gocui.ModNone, nextView); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding(sideView.Name(), gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(sideView.Name(), 'j', gocui.ModNone, cursorDown); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(sideView.Name(), gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(sideView.Name(), 'k', gocui.ModNone, cursorUp); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyArrowLeft, gocui.ModNone, cursorLeft); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyArrowRight, gocui.ModNone, cursorRight); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyPgdn, gocui.ModNone, movements.PgDn); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyPgup, gocui.ModNone, movements.PgUp); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlH, gocui.ModNone, movements.Home); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlE, gocui.ModNone, movements.End); err != nil {
-		return err
-	}
 	if err := g.SetKeybinding(sideView.Name(), gocui.KeyEnter, gocui.ModNone, processOp); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(sideView.Name(), gocui.KeyCtrlS, gocui.ModNone, saveDialog); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding(mainView.Name(), gocui.KeyCtrlS, gocui.ModNone, saveDialog); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
@@ -165,13 +127,20 @@ func init() {
 
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
-
 }
 
 func createLayout(g *gocui.Gui) func(*gocui.Gui) error {
 	status = ui.NewStatusLine(g)
 	mainView = ui.NewMainView(g)
 	sideView = ui.NewTreeView(g)
+
+	mainView.OnSave(func(filename string, err error) {
+		if err != nil {
+			status.UpdateError(fmt.Sprintf("Unable to save response: %v", err.Error()))
+			return
+		}
+		status.UpdateError(fmt.Sprintf("Unable to save response: %v", err.Error()))
+	})
 	return func(g *gocui.Gui) error {
 		if err := sideView.SetView("Operations", groups.ToNodes()); err != nil {
 			return err
@@ -303,37 +272,6 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 			return call.Do()
 		},
 	})
-}
-
-func saveDialog(g *gocui.Gui, v *gocui.View) error {
-	maxX, maxY := g.Size()
-	currentView := g.CurrentView()
-	f, err := ui.NewForm(g, "Save Response", maxX/2-20, maxY/2)
-	if err != nil {
-		return err
-	}
-	f.OnCancel(func() error {
-		_, err := g.SetCurrentView(currentView.Name())
-		return err
-	})
-	f.OnSubmit(func(values map[string]string) error {
-		filename, _ := values["File Name"]
-		if filename == "" {
-			return nil
-		}
-		if err := mainView.SaveContent(filename); err != nil {
-			status.UpdateError(fmt.Sprintf("Unable to save response: %v", err.Error()))
-			return nil
-		}
-		fullPath, err := filepath.Abs(filename)
-		if err != nil {
-			return err
-		}
-		status.UpdateSuccess(fmt.Sprintf("File saved to %v", fullPath))
-		_, err = g.SetCurrentView(currentView.Name())
-		return err
-	})
-	return f.Input(ui.NewInput("File Name", 40, true))
 }
 
 func do() error {

@@ -15,17 +15,10 @@ type Node interface {
 	Children() []Node
 }
 
-//Dir - direction type
-type Dir bool
-
 const (
 	pipe   = "│ "
 	middle = "├─"
 	last   = "└─"
-	//Up direction
-	Up Dir = true
-	//Down direction
-	Down Dir = false
 )
 
 //TreeView - generates a directory tree-like view
@@ -71,6 +64,22 @@ func (m *TreeView) SetView(title string, nodes []Node) error {
 	}
 	return nil
 }
+func (m *TreeView) SetKeybinding() error {
+	name := m.name
+	if err := m.g.SetKeybinding(name, gocui.KeyArrowDown, gocui.ModNone, m.cursorDown); err != nil {
+		return err
+	}
+	if err := m.g.SetKeybinding(name, 'j', gocui.ModNone, m.cursorDown); err != nil {
+		return err
+	}
+	if err := m.g.SetKeybinding(name, gocui.KeyArrowUp, gocui.ModNone, m.cursorUp); err != nil {
+		return err
+	}
+	if err := m.g.SetKeybinding(name, 'k', gocui.ModNone, m.cursorUp); err != nil {
+		return err
+	}
+	return nil
+}
 
 //SetCurrent sets this view as current
 func (m *TreeView) SetCurrent() error {
@@ -88,23 +97,45 @@ func (m TreeView) Selected() []int {
 	return indexes
 }
 
-//MoveCursor moves cursor up/down in the tree view
-func (m *TreeView) MoveCursor(dir Dir) {
-	x, y := m.View.Cursor()
+//moveCursor moves cursor up/down in the tree view
+func (m *TreeView) moveCursor(dir bool) error {
+	cx, cy := m.View.Cursor()
+	ox, oy := m.View.Origin()
+	_, vh := m.View.Size()
 	lines := len(m.View.BufferLines())
-	if dir == Up {
-		if y == 0 {
-			m.View.SetCursor(x, lines-1)
-			return
+	if dir {
+		if cy+oy == 0 {
+			oy = lines - vh
+			if oy < 0 {
+				oy = 0
+			}
+			if err := m.View.SetOrigin(ox, oy); err != nil {
+				return err
+			}
+			cy = vh - 1
+			if cy >= lines {
+				cy = lines - 1
+			}
+			return m.View.SetCursor(cx, cy)
 		}
 		m.View.MoveCursor(0, -1, false)
 	} else {
-		if y == lines-1 {
-			m.View.SetCursor(x, 0)
-			return
+		if oy+cy == lines-1 {
+			if err := m.View.SetCursor(cx, 0); err != nil {
+				return err
+			}
+			return m.View.SetOrigin(ox, 0)
 		}
 		m.View.MoveCursor(0, 1, false)
 	}
+	return nil
+}
+func (m *TreeView) cursorDown(g *gocui.Gui, v *gocui.View) error {
+	return m.moveCursor(false)
+}
+
+func (m *TreeView) cursorUp(g *gocui.Gui, v *gocui.View) error {
+	return m.moveCursor(true)
 }
 
 func Tree(nodes []Node, prefix string) string {

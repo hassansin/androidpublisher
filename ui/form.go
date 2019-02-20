@@ -81,6 +81,7 @@ func (f *Form) Input(input *Input) error {
 		}
 		v.Wrap = true
 		v.Editable = true
+		v.Editor = gocui.EditorFunc(inputEditor)
 		v.Mask = input.Mask
 		if err := f.g.SetKeybinding(v.Name(), gocui.KeyEsc, gocui.ModNone, f.cancel); err != nil {
 			return err
@@ -211,6 +212,13 @@ func (f *Form) setFooter() {
 		fmt.Fprint(v, " ")
 	}
 	fmt.Fprint(v, msg)
+}
+
+func inputEditor(v *gocui.View, key gocui.Key, ch rune, mod gocui.Modifier) {
+	if key == gocui.KeyEnter {
+		return
+	}
+	gocui.DefaultEditor.Edit(v, key, ch, mod)
 }
 
 func strip(str string) string {

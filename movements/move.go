@@ -70,3 +70,31 @@ func End(g *gocui.Gui, v *gocui.View) error {
 	v.SetOrigin(0, len(buffer)-vh)
 	return nil
 }
+
+func CursorDown(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		v.MoveCursor(0, 1, false)
+	}
+	return nil
+}
+
+func CursorUp(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		v.MoveCursor(0, -1, false)
+	}
+	return nil
+}
+
+func CursorLeft(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		v.MoveCursor(-1, 0, false)
+	}
+	return nil
+}
+
+func CursorRight(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		v.MoveCursor(1, 0, false)
+	}
+	return nil
+}
