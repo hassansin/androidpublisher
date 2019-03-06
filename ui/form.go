@@ -23,7 +23,7 @@ type Form struct {
 	formView       *gocui.View
 	inputs         []*Input
 	onCancel       func() error
-	onSubmit       func(map[string]string) error
+	onSubmit       func() error
 	onError        func(error)
 }
 
@@ -50,12 +50,13 @@ func NewForm(g *gocui.Gui, title string, x0, y0 int) (*Form, error) {
 }
 
 //NewInput return new Input
-func NewInput(name string, size int, focused bool) *Input {
+func NewInput(name string, value *string, size int, focused bool) *Input {
 	return &Input{
 		Name:    name,
 		Cols:    size,
 		Rows:    1,
 		focused: focused,
+		Value:   value,
 	}
 }
 
@@ -64,7 +65,8 @@ type Input struct {
 	Rows, Cols        int
 	Required, focused bool
 	Mask              rune
-	Name, value       string
+	Name              string
+	Value             *string
 	view              *gocui.View
 }
 
@@ -150,17 +152,16 @@ func (f *Form) next(g *gocui.Gui, v *gocui.View) error {
 }
 
 func (f *Form) submit(g *gocui.Gui, v *gocui.View) error {
-	values := make(map[string]string)
 	for _, input := range f.inputs {
 		value := strings.TrimSpace(input.view.Buffer())
 		if input.Required && value == "" && f.onError != nil {
 			f.onError(errors.Errorf("missing %v parameter", input.Name))
 			return nil
 		}
-		values[input.Name] = value
+		*input.Value = value
 	}
 	if f.onSubmit != nil {
-		if err := f.onSubmit(values); err != nil {
+		if err := f.onSubmit(); err != nil {
 			return err
 		}
 	}
@@ -182,7 +183,7 @@ func (f *Form) OnCancel(fn func() error) *Form {
 }
 
 //OnSubmit binds function to be called when form is submitted
-func (f *Form) OnSubmit(fn func(map[string]string) error) *Form {
+func (f *Form) OnSubmit(fn func() error) *Form {
 	f.onSubmit = fn
 	return f
 }

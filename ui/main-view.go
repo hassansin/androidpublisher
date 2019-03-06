@@ -145,8 +145,8 @@ func (m *MainView) saveDialog(g *gocui.Gui, v *gocui.View) error {
 		_, err := g.SetCurrentView(currentView.Name())
 		return err
 	})
-	f.OnSubmit(func(values map[string]string) error {
-		filename, _ := values["FileName"]
+	var filename string
+	f.OnSubmit(func() error {
 		if filename == "" {
 			return nil
 		}
@@ -162,5 +162,5 @@ func (m *MainView) saveDialog(g *gocui.Gui, v *gocui.View) error {
 		_, err = g.SetCurrentView(currentView.Name())
 		return err
 	})
-	return f.Input(NewInput("File Name", 40, true))
+	return f.Input(NewInput("File Name", &filename, 40, true))
 }

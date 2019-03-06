@@ -25,10 +25,13 @@ var (
 	mainView      *ui.MainView
 	sideView      *ui.TreeView
 	groups        Groups
-	defaultStatus = fmt.Sprintf("%v:Switch Panel %v:Request %v:Save Response %v:Quit %v:Navigate", aurora.Cyan("TAB"), aurora.Cyan("ENTER"), aurora.Cyan("CTRL+S"), aurora.Cyan("CTRL+C"), aurora.Cyan("↑↓"))
+	defaultStatus = fmt.Sprintf("%v:Switch Panel %v:Request %v:Save Response %v:Quit %v:Navigate %v:Refresh", aurora.Cyan("TAB"), aurora.Cyan("ENTER"), aurora.Cyan("CTRL+S"), aurora.Cyan("CTRL+C"), aurora.Cyan("↑↓"), aurora.Cyan("F5"))
+	activeGr      *Group
+	activeOp      *Operation
 )
 
 func nextView(g *gocui.Gui, v *gocui.View) error {
+	status.Reset()
 	if v == nil || v.Name() == sideView.Name() {
 		return mainView.SetCurrent()
 	}
@@ -56,10 +59,7 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 		return sideView.SetCurrent()
 	}).OnError(func(err error) {
 		status.UpdateError(err.Error())
-	}).OnSubmit(func(values map[string]string) error {
-		for _, param := range op.Params {
-			param.Value = values[param.Name]
-		}
+	}).OnSubmit(func() error {
 		go makeRequest(g, grp, op)
 		return sideView.SetCurrent()
 	})
@@ -68,7 +68,7 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 		if i == 0 {
 			focused = true
 		}
-		input := ui.NewInput(param.Name, 60, focused)
+		input := ui.NewInput(param.Name, &param.Value, 60, focused)
 		if param.Multiline {
 			input.Rows = 6
 		}
@@ -80,8 +80,17 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func reRequest(g *gocui.Gui, v *gocui.View) error {
+	if activeGr != nil && activeOp != nil {
+		go makeRequest(g, activeGr, activeOp)
+	}
+	return nil
+}
+
 func makeRequest(g *gocui.Gui, grp *Group, op *Operation) {
 	status.Update("Loading...")
+	activeGr = grp
+	activeOp = op
 	result, err := op.Do(op.Params)
 	g.Update(func(g *gocui.Gui) error {
 		if err != nil {
@@ -113,6 +122,21 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 	if err := g.SetKeybinding(sideView.Name(), gocui.KeyEnter, gocui.ModNone, processOp); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding(sideView.Name(), gocui.KeyF5, gocui.ModNone, reRequest); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("", gocui.KeyArrowDown, gocui.ModNone, func(_ *gocui.Gui, _ *gocui.View) error {
+		status.Reset()
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("", gocui.KeyArrowUp, gocui.ModNone, func(_ *gocui.Gui, _ *gocui.View) error {
+		status.Reset()
+		return nil
+	}); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
