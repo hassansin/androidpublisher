@@ -163,7 +163,7 @@ func createLayout(g *gocui.Gui) func(*gocui.Gui) error {
 			status.UpdateError(fmt.Sprintf("Unable to save response: %v", err.Error()))
 			return
 		}
-		status.UpdateError(fmt.Sprintf("Unable to save response: %v", err.Error()))
+		status.UpdateSuccess(fmt.Sprintf("File saved to %v", filename))
 	})
 	return func(g *gocui.Gui) error {
 		if err := sideView.SetView("Operations", groups.ToNodes()); err != nil {
