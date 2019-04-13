@@ -41,7 +41,8 @@ androidpublisher --package com.example.android --credentials "path to service ac
 
 ## Screenshots
 
-![screenshot](screenshot.png)
+![screensho](https://user-images.githubusercontent.com/4618044/56081498-e5008080-5e2f-11e9-9dce-2dc87c3189b2.png)
+
 
 ### TODO
 
