@@ -2,6 +2,7 @@ module github.com/hassansin/androidpublisher
 
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/atotto/clipboard v0.1.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/google/pprof v0.0.0-20190109223431-e84dfd68c163 // indirect

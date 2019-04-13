@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/hassansin/androidpublisher/movements"
 	"github.com/hassansin/gocui"
 	"github.com/nwidger/jsoncolor"
@@ -78,6 +79,9 @@ func (m *MainView) SetKeybinding() error {
 		return err
 	}
 	if err := m.g.SetKeybinding("", gocui.KeyCtrlS, gocui.ModNone, m.saveDialog); err != nil {
+		return err
+	}
+	if err := m.g.SetKeybinding("", gocui.KeyCtrlX, gocui.ModNone, m.copyToClipboard); err != nil {
 		return err
 	}
 	return nil
@@ -163,4 +167,10 @@ func (m *MainView) saveDialog(g *gocui.Gui, v *gocui.View) error {
 		return err
 	})
 	return f.Input(NewInput("File Name", &filename, 40, true))
+}
+
+func (m *MainView) copyToClipboard(g *gocui.Gui, v *gocui.View) error {
+	//@TODO update status line
+	clipboard.WriteAll(m.View.Buffer())
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/hassansin/androidpublisher/movements"
 	"github.com/hassansin/gocui"
 	"github.com/logrusorgru/aurora"
 	"github.com/pkg/errors"
@@ -94,15 +95,25 @@ func (f *Form) Input(input *Input) error {
 		if err := f.g.SetKeybinding(v.Name(), gocui.KeyEnter, gocui.ModNone, f.submit); err != nil {
 			return err
 		}
+		if err := f.g.SetKeybinding(v.Name(), gocui.KeyCtrlK, gocui.ModNone, movements.DeleteTheRestOfTheLine); err != nil {
+			return err
+		}
+		if err := f.g.SetKeybinding(v.Name(), gocui.KeyCtrlH, gocui.ModNone, movements.Home); err != nil {
+			return err
+		}
+		if err := f.g.SetKeybinding(v.Name(), gocui.KeyCtrlE, gocui.ModNone, movements.End); err != nil {
+			return err
+		}
 		if input.focused {
 			if _, err = f.g.SetCurrentView(v.Name()); err != nil {
 				return err
 			}
 		}
-		f.y1 = f.y1 + 4
+		f.y1 = f.y1 + 3 + input.Rows
 		if input.Cols >= f.x1-f.x0 {
 			f.x1 = f.x0 + input.Cols + 4
 		}
+		fmt.Fprint(v, *input.Value)
 
 		input.view = v
 		f.inputs = append(f.inputs, input)

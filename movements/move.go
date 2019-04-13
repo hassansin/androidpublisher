@@ -1,6 +1,9 @@
 package movements
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/hassansin/gocui"
 )
 
@@ -96,5 +99,18 @@ func CursorRight(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		v.MoveCursor(1, 0, false)
 	}
+	return nil
+}
+
+func DeleteTheRestOfTheLine(g *gocui.Gui, v *gocui.View) error {
+	x, y := v.Cursor()
+	lines := v.BufferLines()
+	if len(lines) < y {
+		return nil
+	}
+	lines[y] = lines[y][:x]
+
+	v.Clear()
+	fmt.Fprint(v, strings.Join(lines, "\n"))
 	return nil
 }

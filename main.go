@@ -51,7 +51,7 @@ func processOp(g *gocui.Gui, v *gocui.View) error {
 		go makeRequest(g, grp, op)
 		return nil
 	}
-	f, err := ui.NewForm(g, "Parameters", maxX/2-30, maxY/3-(len(op.Params)-1)/2)
+	f, err := ui.NewForm(g, "Parameters", maxX/2-30, maxY/2-int(float64(len(op.Params))*4/2)-1)
 	if err != nil {
 		return err
 	}
@@ -196,8 +196,26 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 		},
 	})
 	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Delete",
+		Params: []*Param{{Name: "SKU", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewInappproductsService(service)
+			call := s.Delete(pkgName, params[0].Value)
+			return nil, call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
 		Params: []*Param{{Name: "SKU", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewInappproductsService(service)
+			call := s.Get(pkgName, params[0].Value)
+			return call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Patch",
+		Params: []*Param{{Name: "SKU", Required: true}, {Name: "Body", Multiline: true}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewInappproductsService(service)
 			call := s.Get(pkgName, params[0].Value)
@@ -233,12 +251,64 @@ func initOperations(service *androidpublisher.Service, pkgName string) {
 	grp = &Group{Name: "Purchases.subscriptions"}
 	groups = append(groups, grp)
 	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Cancel",
+		Params: []*Param{{Name: "SubscriptionId", Required: true}, {Name: "Token", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewPurchasesSubscriptionsService(service)
+			call := s.Cancel(pkgName, params[0].Value, params[1].Value)
+			return nil, call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
+		Name: "Defer",
+		Params: []*Param{
+			{Name: "SubscriptionId", Required: true}, {Name: "Token", Required: true},
+			{Name: "DesiredExpiryTimeMillis", Required: true}, {Name: "ExpectedExpiryTimeMillis", Required: true},
+		},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewPurchasesSubscriptionsService(service)
+			desired, err := strconv.ParseInt(params[2].Value, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			expected, err := strconv.ParseInt(params[3].Value, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			call := s.Defer(pkgName, params[0].Value, params[1].Value, &androidpublisher.SubscriptionPurchasesDeferRequest{
+				DeferralInfo: &androidpublisher.SubscriptionDeferralInfo{
+					DesiredExpiryTimeMillis:  desired,
+					ExpectedExpiryTimeMillis: expected,
+				},
+			})
+			return call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
 		Name:   "Get",
 		Params: []*Param{{Name: "SubscriptionId", Required: true}, {Name: "Token", Required: true}},
 		Do: func(params []*Param) (interface{}, error) {
 			s := androidpublisher.NewPurchasesSubscriptionsService(service)
 			call := s.Get(pkgName, params[0].Value, params[1].Value)
 			return call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Refund",
+		Params: []*Param{{Name: "SubscriptionId", Required: true}, {Name: "Token", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewPurchasesSubscriptionsService(service)
+			call := s.Refund(pkgName, params[0].Value, params[1].Value)
+			return nil, call.Do()
+		},
+	})
+	grp.Operations = append(grp.Operations, &Operation{
+		Name:   "Revoke",
+		Params: []*Param{{Name: "SubscriptionId", Required: true}, {Name: "Token", Required: true}},
+		Do: func(params []*Param) (interface{}, error) {
+			s := androidpublisher.NewPurchasesSubscriptionsService(service)
+			call := s.Revoke(pkgName, params[0].Value, params[1].Value)
+			return nil, call.Do()
 		},
 	})
 
